@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Sentimientos en Tweets</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fab fa-twitter"></i> Análisis de Sentimientos en Tweets</h1>
+            <p class="subtitle">Proyecto de Inteligencia Artificial - Universidad Rafael Landívar</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <h2>Ingresa un Tweet para analizar</h2>
+                <textarea id="tweet-input" placeholder="Escribe o pega un tweet aquí..."></textarea>
+                <div class="button-container">
+                    <button id="analyze-btn" class="primary-btn">Analizar Sentimiento</button>
+                    <button id="clear-btn" class="secondary-btn">Limpiar</button>
+                </div>
+                
+                <div class="examples-section">
+                    <h3>Ejemplos de tweets del dataset</h3>
+                    <div class="examples-container">
+                        <div class="example-group">
+                            <h4>Tweets positivos</h4>
+                            <ul class="examples-list">
+                                {% if examples.positivo %}
+                                    {% for example in examples.positivo %}
+                                    <li><a href="#" class="example-link">{{ example }}</a></li>
+                                    {% endfor %}
+                                {% else %}
+                                    <li class="no-examples">No hay ejemplos disponibles. Verifica que el dataset esté en la carpeta correcta.</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <div class="example-group">
+                            <h4>Tweets negativos</h4>
+                            <ul class="examples-list">
+                                {% if examples.negativo %}
+                                    {% for example in examples.negativo %}
+                                    <li><a href="#" class="example-link">{{ example }}</a></li>
+                                    {% endfor %}
+                                {% else %}
+                                    <li class="no-examples">No hay ejemplos disponibles. Verifica que el dataset esté en la carpeta correcta.</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="result-section" class="result-section hidden">
+                <h2>Resultado del Análisis</h2>
+                <div class="result-card">
+                    <div id="sentiment-icon" class="sentiment-icon">
+                        <i class="far fa-smile"></i>
+                    </div>
+                    <div class="result-details">
+                        <h3>Sentimiento: <span id="sentiment-label">Positivo</span></h3>
+                        <div class="confidence-bar-container">
+                            <p>Nivel de confianza: <span id="confidence-value">0%</span></p>
+                            <div class="confidence-bar">
+                                <div id="confidence-fill" class="confidence-fill"></div>
+                            </div>
+                        </div>
+                        <div class="probabilities">
+                            <div class="probability-item">
+                                <span class="prob-label">Positivo:</span>
+                                <div class="prob-bar-container">
+                                    <div id="positive-prob" class="prob-bar positive"></div>
+                                    <span id="positive-value">0%</span>
+                                </div>
+                            </div>
+                            <div class="probability-item">
+                                <span class="prob-label">Negativo:</span>
+                                <div class="prob-bar-container">
+                                    <div id="negative-prob" class="prob-bar negative"></div>
+                                    <span id="negative-value">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="analyzed-text-container">
+                    <h3>Tweet analizado:</h3>
+                    <p id="analyzed-text" class="analyzed-text"></p>
+                </div>
+            </div>
+
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Analizando sentimiento...</p>
+            </div>
+
+            <div id="error-message" class="error-message hidden">
+                <i class="fas fa-exclamation-circle"></i>
+                <p id="error-text">Error al analizar el tweet.</p>
+            </div>
+        </main>
+
+        <footer>
+            <p>Implementación de Naive Bayes para análisis de sentimientos | 2025</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tweetInput = document.getElementById('tweet-input');
+            const analyzeBtn = document.getElementById('analyze-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const resultSection = document.getElementById('result-section');
+            const loading = document.getElementById('loading');
+            const errorMessage = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+            
+            const sentimentIcon = document.getElementById('sentiment-icon');
+            const sentimentLabel = document.getElementById('sentiment-label');
+            const confidenceValue = document.getElementById('confidence-value');
+            const confidenceFill = document.getElementById('confidence-fill');
+            const positiveProb = document.getElementById('positive-prob');
+            const negativeProb = document.getElementById('negative-prob');
+            const positiveValue = document.getElementById('positive-value');
+            const negativeValue = document.getElementById('negative-value');
+            const analyzedText = document.getElementById('analyzed-text');
+            
+            // Función para analizar el tweet
+            analyzeBtn.addEventListener('click', function() {
+                const tweet = tweetInput.value.trim();
+                
+                if (!tweet) {
+                    showError('Por favor, ingresa un tweet para analizar.');
+                    return;
+                }
+                
+                // Ocultar resultados anteriores y mostrar loading
+                resultSection.classList.add('hidden');
+                errorMessage.classList.add('hidden');
+                loading.classList.remove('hidden');
+                
+                // Realizar la petición al backend
+                fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: tweet }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    loading.classList.add('hidden');
+                    
+                    if (data.error) {
+                        showError(data.error);
+                        return;
+                    }
+                    
+                    // Actualizar la UI con los resultados
+                    updateResults(data, tweet);
+                })
+                .catch(error => {
+                    loading.classList.add('hidden');
+                    showError('Error al conectar con el servidor: ' + error.message);
+                });
+            });
+            
+            // Función para actualizar los resultados en la UI
+            function updateResults(data, tweet) {
+                // Mostrar la sección de resultados
+                resultSection.classList.remove('hidden');
+                
+                // Actualizar el texto analizado
+                analyzedText.textContent = tweet;
+                
+                // Actualizar etiqueta de sentimiento
+                sentimentLabel.textContent = data.prediction.charAt(0).toUpperCase() + data.prediction.slice(1);
+                
+                // Actualizar icono de sentimiento
+                if (data.prediction === 'positivo') {
+                    sentimentIcon.innerHTML = '<i class="far fa-smile"></i>';
+                    sentimentIcon.className = 'sentiment-icon positive';
+                } else {
+                    sentimentIcon.innerHTML = '<i class="far fa-frown"></i>';
+                    sentimentIcon.className = 'sentiment-icon negative';
+                }
+                
+                // Actualizar nivel de confianza
+                const confidencePercent = Math.round(data.confidence * 100);
+                confidenceValue.textContent = confidencePercent + '%';
+                confidenceFill.style.width = confidencePercent + '%';
+                
+                // Actualizar probabilidades
+                const positivePercent = Math.round(data.probabilities.positivo * 100);
+                const negativePercent = Math.round(data.probabilities.negativo * 100);
+                
+                positiveProb.style.width = positivePercent + '%';
+                negativeProb.style.width = negativePercent + '%';
+                positiveValue.textContent = positivePercent + '%';
+                negativeValue.textContent = negativePercent + '%';
+            }
+            
+            // Función para mostrar mensajes de error
+            function showError(message) {
+                errorMessage.classList.remove('hidden');
+                errorText.textContent = message;
+            }
+            
+            // Botón para limpiar la entrada
+            clearBtn.addEventListener('click', function() {
+                tweetInput.value = '';
+                resultSection.classList.add('hidden');
+                errorMessage.classList.add('hidden');
+            });
+            
+            // Manejar ejemplos de tweets
+            document.querySelectorAll('.example-link').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    tweetInput.value = this.textContent;
+                    tweetInput.focus();
+                    // Desplazarse al área del textarea
+                    tweetInput.scrollIntoView({ behavior: 'smooth' });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
