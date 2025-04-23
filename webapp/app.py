@@ -44,38 +44,57 @@ def get_examples_from_dataset(dataset_path, num_examples=3):
             
         with open(dataset_path, 'r', encoding='latin-1') as file:
             reader = csv.reader(file)
-            # Leer todas las filas y agrupar por sentimiento
             positive_tweets = []
             negative_tweets = []
             
-            # Limitamos la cantidad de filas a leer para no cargar todo el dataset
-            max_rows = 5000
-            count = 0
+            # Para el dataset Sentiment140:
+            # - Los primeros 800,000 tweets son negativos (etiqueta 0)
+            # - Los últimos 800,000 tweets son positivos (etiqueta 4)
             
+            print("Buscando ejemplos de tweets...")
+            
+            count = 0
             for row in reader:
-                if count >= max_rows:
-                    break
-                    
                 try:
                     sentiment = int(row[0].strip('"'))
                     tweet_text = row[5]
                     
-                    # Filtrar tweets muy cortos o muy largos
-                    if 20 <= len(tweet_text) <= 140:
-                        if sentiment == 0:
-                            negative_tweets.append(tweet_text)
-                        elif sentiment == 4:
-                            positive_tweets.append(tweet_text)
-                except:
-                    pass
+                    # Recolectar algunos tweets negativos del inicio
+                    if sentiment == 0 and 20 <= len(tweet_text) <= 140 and len(negative_tweets) < 50:
+                        negative_tweets.append(tweet_text)
                     
-                count += 1
+                    # Continuar hasta encontrar los tweets positivos (después de la fila 800,000)
+                    if count > 800000 and sentiment == 4 and 20 <= len(tweet_text) <= 140:
+                        positive_tweets.append(tweet_text)
+                        if len(positive_tweets) >= 50:  # Suficientes ejemplos positivos
+                            break
+                    
+                    count += 1
+                    
+                    # Mostrar progreso
+                    if count % 100000 == 0:
+                        print(f"Procesados {count} registros... ({len(positive_tweets)} positivos encontrados)")
+                    
+                    # Si ya tenemos suficientes ejemplos negativos y estamos cerca de los positivos
+                    if len(negative_tweets) >= 50 and count < 800000:
+                        # Saltar directamente a donde deberían estar los positivos
+                        for _ in range(800000 - count):
+                            next(reader)
+                        count = 800000
+                        print("Saltando a la sección de tweets positivos...")
+                        
+                except Exception as e:
+                    if count < 10:
+                        print(f"Error en fila {count}: {e}")
+                    pass
             
             # Seleccionar aleatoriamente los ejemplos
             if positive_tweets:
                 examples["positivo"] = random.sample(positive_tweets, min(num_examples, len(positive_tweets)))
             if negative_tweets:
                 examples["negativo"] = random.sample(negative_tweets, min(num_examples, len(negative_tweets)))
+            
+            print(f"Debug: Encontrados {len(positive_tweets)} tweets positivos y {len(negative_tweets)} tweets negativos")
                 
         return examples
         

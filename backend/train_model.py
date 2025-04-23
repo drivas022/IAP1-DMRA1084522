@@ -28,10 +28,12 @@ def load_sentiment140_dataset(file_path, limit=None):
         pos_count = 0
         neg_count = 0
         
+        # IMPORTANTE: Leemos TODO el archivo, no solo los primeros registros
+        # Los primeros 800,000 son negativos y los últimos 800,000 son positivos
         for row in csv_reader:
-            # La estructura del CSV de Sentiment140 es:
-            # target (0 = negativo, 4 = positivo), id, fecha, query, usuario, texto
             try:
+                # La estructura del CSV de Sentiment140 es:
+                # target (0 = negativo, 4 = positivo), id, fecha, query, usuario, texto
                 sentiment = int(row[0].strip('"'))  # Limpiamos posibles comillas
                 text = row[5]
                 
@@ -42,6 +44,10 @@ def load_sentiment140_dataset(file_path, limit=None):
                 elif sentiment == 4:
                     label = 1  # Positivo
                     pos_count += 1
+                    # Debug: mostrar cuando encontramos el primer tweet positivo
+                    if pos_count == 1:
+                        print(f"\n¡Encontrado el primer tweet positivo en la fila {count}!")
+                        print(f"Tweet: {text[:100]}...")
                 else:
                     continue  # Ignorar otros valores
                     
@@ -49,6 +55,8 @@ def load_sentiment140_dataset(file_path, limit=None):
                 y.append(label)
                 
                 count += 1
+                
+                # Si se especifica un límite, respetarlo
                 if limit and count >= limit:
                     break
                 
@@ -56,11 +64,26 @@ def load_sentiment140_dataset(file_path, limit=None):
                 if count % 100000 == 0:
                     print(f"Procesados {count} tweets ({pos_count} positivos, {neg_count} negativos)")
                 
-            except (ValueError, IndexError) as e:
-                print(f"Error procesando fila: {e}")
-                continue
+                # Informar cuando se llega a los 800,000 registros
+                if count == 800000:
+                    print(f"\n=== Alcanzados 800,000 registros ===")
+                    print(f"Negativos: {neg_count}, Positivos: {pos_count}")
+                    print("Continuando con los tweets positivos...\n")
                 
-    print(f"Dataset cargado: {len(X)} ejemplos ({pos_count} positivos, {neg_count} negativos)")
+            except (ValueError, IndexError) as e:
+                print(f"Error procesando fila {count}: {e}")
+                continue
+        
+        # Verificación final
+        if pos_count == 0:
+            print("\n¡ADVERTENCIA! No se encontraron tweets positivos en el dataset.")
+            print("Verifica que el archivo contenga los 1.6 millones de registros completos.")
+        else:
+            print(f"\nDataset cargado exitosamente:")
+            print(f"- Total: {len(X)} ejemplos")
+            print(f"- Positivos: {pos_count} ({pos_count/len(X)*100:.1f}%)")
+            print(f"- Negativos: {neg_count} ({neg_count/len(X)*100:.1f}%)")
+    
     return X, np.array(y)
 
 def main():
