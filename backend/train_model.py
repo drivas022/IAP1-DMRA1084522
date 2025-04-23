@@ -67,8 +67,8 @@ def main():
     """
     Función principal para entrenar el modelo
     """
-    # Ruta al dataset
-    dataset_path = 'dataset/training.1600000.processed.noemoticon.csv'
+    # Ruta al dataset - usando ruta relativa desde la carpeta backend
+    dataset_path = '../dataset/training.1600000.processed.noemoticon.csv'
     
     # Verificar si el directorio de modelo existe, si no, crearlo
     if not os.path.exists('models'):
