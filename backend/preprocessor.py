@@ -4,7 +4,7 @@ from collections import Counter
 
 class Preprocessor:
     def __init__(self):
-        # Lista de stopwords en inglés
+        # Lista de stopwords en inglés (con algunas negaciones importantes conservadas)
         self.stopwords = {
             'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any',
             'are', 'aren\'t', 'as', 'at', 'be', 'because', 'been', 'before', 'being', 'below',
@@ -27,70 +27,44 @@ class Preprocessor:
             'you\'re', 'you\'ve', 'your', 'yours', 'yourself', 'yourselves'
         }
 
+        # Reincorporar negaciones importantes
+        self.keep_stopwords = {'not', 'no', "don't", "didn't", "wasn't", "won't"}
+        self.stopwords -= self.keep_stopwords
+
     def clean_text(self, text):
         """
         Limpia el texto de caracteres especiales, enlaces, etc.
         """
-        # Convertir a minúsculas
         text = text.lower()
-        
-        # Eliminar menciones de usuario (@usuario)
         text = re.sub(r'@\w+', '', text)
-        
-        # Eliminar URLs
         text = re.sub(r'http\S+|www\S+|https\S+', '', text)
-        
-        # Eliminar hashtags (#hashtag)
         text = re.sub(r'#\w+', '', text)
-        
-        # Eliminar RT (retweet)
         text = re.sub(r'\brt\b', '', text)
-        
-        # Eliminar números
         text = re.sub(r'\d+', '', text)
-        
-        # Eliminar puntuación
         text = text.translate(str.maketrans('', '', string.punctuation))
-        
-        # Eliminar espacios adicionales
         text = re.sub(r'\s+', ' ', text).strip()
-        
         return text
 
     def tokenize(self, text):
-        """
-        Divide el texto en tokens (palabras)
-        """
         return text.split()
 
     def remove_stopwords(self, tokens):
-        """
-        Elimina stopwords de la lista de tokens
-        """
         return [token for token in tokens if token not in self.stopwords]
 
     def preprocess(self, text):
-        """
-        Realiza todo el proceso de preprocesamiento
-        """
         cleaned_text = self.clean_text(text)
         tokens = self.tokenize(cleaned_text)
         filtered_tokens = self.remove_stopwords(tokens)
         return filtered_tokens
     
     def build_vocabulary(self, preprocessed_data):
-        """
-        Construye el vocabulario a partir de los datos preprocesados
-        """
         all_words = []
         for tokens in preprocessed_data:
             all_words.extend(tokens)
-        
-        # Contar frecuencia de palabras y crear vocabulario
         word_counts = Counter(all_words)
-        
-        # Eliminar palabras poco frecuentes (opcional)
-        min_count = 5
+        min_count = 1  # <-- antes estaba en 5, ahora 1 para no perder palabras clave
         vocabulary = [word for word, count in word_counts.items() if count >= min_count]
-        
         return vocabulary
+
+
+
