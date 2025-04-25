@@ -56,40 +56,25 @@ Para ejecutar este proyecto, necesitas tener instalado:
 
 ## Entrenamiento del Modelo
 
-Existen dos opciones para entrenar el modelo:
-
-### Opción 1: Entrenamiento con Muestra Reducida (Rápido, recomendado para pruebas)
-
-El código por defecto está configurado para usar una muestra de 100,000 tweets, lo que permite un entrenamiento relativamente rápido:
+El código está configurado para entrenar el modelo con el dataset completo, procesando hasta 800,000 tweets (balanceando entre positivos y negativos):
 
 ```bash
 cd backend
 python train_model.py
 ```
 
-Tiempo estimado: ~3-5 minutos (varía según el hardware).
+El proceso incluye:
+1. Carga del dataset completo
+2. Balanceo de clases (igual cantidad de tweets positivos y negativos)
+3. Preprocesamiento y tokenización
+4. División en conjuntos de entrenamiento (80%) y prueba (20%)
+5. Entrenamiento del modelo Naive Bayes
+6. Evaluación con métricas detalladas
+7. Guardado del modelo y preprocessor
 
-### Opción 2: Entrenamiento con Dataset Completo (Lento, mejor precisión)
+Tiempo estimado: ~15-30 minutos (varía según el hardware).
 
-Para entrenar con el dataset completo (1.6 millones de tweets), modifica la línea en `backend/train_model.py`:
-
-```python
-# Cambiar esta línea:
-X, y = load_sentiment140_dataset(dataset_path, limit=100000)
-
-# Por esta:
-X, y = load_sentiment140_dataset(dataset_path)
-```
-
-Luego ejecuta:
-```bash
-cd backend
-python train_model.py
-```
-
-Tiempo estimado: ~1-3 horas (varía significativamente según el hardware).
-
-**Nota:** El entrenamiento con el dataset completo requiere más memoria RAM. Se recomienda un mínimo de 8GB de RAM para el proceso completo.
+**Nota:** El entrenamiento requiere suficiente memoria RAM. Se recomienda un mínimo de 8GB de RAM para el proceso completo.
 
 ## Ejecución de la Aplicación Web
 
@@ -108,53 +93,62 @@ Una vez que el modelo está entrenado y guardado en `backend/models/`:
 
 3. Utiliza la interfaz para:
    - Escribir o pegar un tweet para analizar
-   - Seleccionar ejemplos del dataset
+   - Seleccionar ejemplos reales del dataset
    - Ver las predicciones de sentimiento (positivo o negativo)
-   - Examinar el nivel de confianza y las probabilidades
+   - Examinar el nivel de confianza y las probabilidades detalladas
 
 ## Componentes del Proyecto
 
 ### Backend
 
 1. **preprocessor.py**
-   - Limpieza y tokenización de texto
-   - Eliminación de stopwords, URLs, menciones, etc.
-   - Construcción de vocabulario
+   - Limpieza completa de texto (minúsculas, eliminación de URLs, menciones, hashtags, RT, números)
+   - Eliminación de puntuación y caracteres especiales
+   - Tokenización y eliminación de stopwords
+   - Construcción de vocabulario con filtrado por frecuencia mínima
 
 2. **naive_bayes.py**
    - Implementación desde cero del algoritmo Naive Bayes
-   - Entrenamiento con suavizado Laplace
-   - Cálculo de métricas (precisión, recall, F1-score)
+   - Suavizado Laplace (alpha=1.0) para manejar palabras desconocidas
+   - Cálculo de probabilidades en escala logarítmica para estabilidad numérica
+   - Métricas de evaluación completas (precisión, recall, F1-score)
+   - Matriz de confusión para análisis detallado
 
 3. **train_model.py**
-   - Carga y procesamiento del dataset
-   - Entrenamiento y evaluación del modelo
-   - Guardado del modelo entrenado
+   - Carga del dataset con manejo de encoding latin-1
+   - Balanceo automático de clases
+   - Preprocesamiento optimizado con recolección de basura
+   - Guardado de modelo y preprocessor usando pickle
 
 4. **inference.py**
    - Motor de inferencia para nuevos tweets
-   - Carga del modelo preentrenado
-   - Predicción de sentimientos
+   - Carga del modelo y preprocessor preentrenados
+   - Mapeo de etiquetas numéricas a texto legible
+   - Predicción con probabilidades detalladas
 
 ### Frontend
 
 1. **app.py**
-   - Aplicación Flask para servir la interfaz web
-   - Integración con el motor de inferencia
-   - Carga de ejemplos del dataset
+   - Aplicación Flask con rutas específicas para análisis y estado
+   - Integración directa con el motor de inferencia
+   - Carga dinámica de ejemplos reales desde el dataset
+   - Manejo robusto de errores y validaciones
 
 2. **index.html**
-   - Interfaz de usuario para ingresar tweets
-   - Visualización de resultados
-   - Ejemplos interactivos del dataset
+   - Interfaz moderna y responsiva
+   - Visualización clara de resultados con íconos de sentimiento
+   - Barras de progreso animadas para probabilidades
+   - Sección de ejemplos interactivos del dataset real
 
 3. **style.css**
-   - Estilos responsivos para la interfaz web
-   - Visualización de resultados con barras de confianza
+   - Diseño responsivo con media queries
+   - Variables CSS para consistencia de colores
+   - Efectos visuales y animaciones para mejor UX
+   - Soporte para temas claros y oscuros
 
 ## Formato del Dataset
 
-El dataset Sentiment140 contiene tweets etiquetados con su sentimiento:
+El dataset Sentiment140 contiene 1.6 millones de tweets etiquetados:
 
 - **Estructura**: CSV con 6 campos
   1. `target`: 0 (negativo) o 4 (positivo)
@@ -174,22 +168,32 @@ El dataset Sentiment140 contiene tweets etiquetados con su sentimiento:
 ### El modelo no se carga
 - Verifica que existan los archivos `backend/models/model.pkl` y `backend/models/preprocessor.pkl`
 - Asegúrate de haber ejecutado correctamente `train_model.py`
+- Comprueba que las rutas relativas sean correctas en `webapp/app.py`
 
 ### Error al cargar el dataset
 - Comprueba que el archivo CSV esté en la carpeta correcta (`dataset/`)
 - Verifica el nombre del archivo (`training.1600000.processed.noemoticon.csv`)
-- Asegúrate de que el archivo no esté dañado
+- Asegúrate de que el archivo no esté dañado y sea legible
 
 ### Problemas de memoria durante el entrenamiento
-- Reduce el valor de `limit` en `train_model.py`
-- Cierra otras aplicaciones que consuman mucha memoria
-- Considera usar un equipo con más RAM para el entrenamiento con el dataset completo
+- El código incluye manejo de memoria con `gc.collect()`
+- Si persisten los problemas, considera usar una máquina con más RAM
+- Procesa el dataset en lotes más pequeños si es necesario
+
+### La interfaz web no carga ejemplos
+- Verifica que el dataset esté en la ubicación correcta
+- Asegúrate de que Flask pueda acceder al archivo del dataset
+- Revisa los permisos de lectura del archivo CSV
 
 ## Evaluación y Métricas
 
-Después del entrenamiento, el sistema mostrará las métricas de evaluación:
-- Precisión: exactitud de las predicciones positivas
-- Recall: capacidad para encontrar todas las instancias positivas
-- F1-score: media armónica entre precisión y recall
-- Matriz de confusión: tabla de predicciones correctas e incorrectas
+El sistema proporciona evaluación completa con:
+- **Precisión**: Exactitud de las predicciones positivas
+- **Recall**: Capacidad para encontrar todas las instancias positivas
+- **F1-score**: Media armónica entre precisión y recall
+- **Matriz de confusión**: Análisis detallado de predicciones correctas e incorrectas
+- **Métricas por clase y promedio**: Evaluación detallada para cada sentimiento
+
+Las métricas se calculan automáticamente al finalizar el entrenamiento y se muestran en la consola.
+
 
